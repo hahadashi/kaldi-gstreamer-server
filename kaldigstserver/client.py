@@ -60,14 +60,15 @@ class MyClient(WebSocketClient):
             print >> sys.stderr, "Audio sent, now sending EOS"
             self.send("EOS")
 
+#这里用到了多线程，
         t = threading.Thread(target=send_data_to_ws)
         t.start()
 
 
     def received_message(self, m):
         response = json.loads(str(m))
-        #print >> sys.stderr, "RESPONSE:", response
-        #print >> sys.stderr, "JSON was:", m
+        print >> sys.stderr, "RESPONSE:", response
+        print >> sys.stderr, "JSON was:", m
         if response['status'] == 0:
             if 'result' in response:
                 trans = response['result']['hypotheses'][0]['transcript']
@@ -92,6 +93,11 @@ class MyClient(WebSocketClient):
 
 
     def get_full_hyp(self, timeout=60):
+#Queue是python标准库中的线程安全的队列FIFO实现，提供类一个适用于多线程编程的先进先出数据结构，即队列，
+#用在生产者和消费者线程之间的信息传递;
+#这里的get方法，1、如果可选的参数block为True且timeout为空对象（默认的情况，阻塞调用，无超时）。
+#2、如果timeout是个正整数，阻塞调用进程最多timeout秒，如果一直无空空间可用，抛出Full异常（带超时的阻塞调用）。
+#3、如果block为False，如果有空闲空间可用将数据放入队列，否则立即抛出Full异常
         return self.final_hyp_queue.get(timeout)
 
     def closed(self, code, reason=None):
@@ -119,6 +125,10 @@ def main():
 
     ws = MyClient(args.audiofile, args.uri + '?%s' % (urllib.urlencode([("content-type", content_type)])), byterate=args.rate,
                   save_adaptation_state_filename=args.save_adaptation_state, send_adaptation_state_filename=args.send_adaptation_state)
+    
+#connect(),如果握手成功，就会调用opened()方法，在这个方法中，会立即发送数据至服务器
+#如果服务器返回数据到达，调用received_message(message);
+#最终会调用closed()
     ws.connect()
     result = ws.get_full_hyp()
     print result.encode('utf-8')
